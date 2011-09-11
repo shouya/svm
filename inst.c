@@ -32,111 +32,76 @@ inst_t __inst[] = {
     {18, "or", _inst_or, "rv"},
     {19, "xor", _inst_xor, "rv"},
     {20, "shl", _inst_shl, "rv"},
-    {21, "shr", _inst_shr, "rv"}
+    {21, "shr", _inst_shr, "rv"},
+/* cont. math */
+    {22, "inc", _inst_inc, "r"},
+    {23, "dec", _inst_dec, "r"},
+/* function call */
+    {24, "call", _inst_call, "j"},
+    {25, "ret", _inst_ret, ""},
+/* stack operation */
+    {26, "push", _inst_push, "v"},
+    {27, "pop", _inst_pop, "r"},
+    {28, "pushf", _inst_pushf, ""},
+    {29, "popf", _inst_popf, "r"},
+/* nop */
+    {30, "nop", _inst_nop, ""}
 };
 
 
 int _inst_mov(INST_ARG) {
-    int* arg0, arg1;
-
-    arg0 = getregister(val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-
-    *arg0 = arg1;
-
+    *getregister(val_arr[0]) = getrvalue(type_arr[1], val_arr[1]);
     return SUCCESS;
 }
  
 int _inst_prn(INST_ARG) {
-    int vt, vv, v;
-
-    vt = type_arr[0];
-    vv = val_arr[0];
-
-    v = getrvalue(vt, vv);
-
-    printf("%d", v);
-
+    printf("%d", getrvalue(type_arr[0], val_arr[0]));
     return SUCCESS;
 }
 
 int _inst_pchr(INST_ARG) {
-    int vt, vv, v;
-
-    vt = type_arr[0];
-    vv = val_arr[0];
-
-    v = getrvalue(vt, vv);
-
-    printf("%c", v);
-
+    putchar(getrvalue(type_arr[0], val_arr[0]));
     return SUCCESS;
 }
 
 int _inst_jmp(INST_ARG) {
-    int target = val_arr[0];
-    if (target == 0) {
-        fprintf(stderr, "no such jump point.\n");
-        return FAILURE;
-    }
-    fseek(src_file, target, SEEK_SET);
+    fseek(src_file, val_arr[0], SEEK_SET);
     return SUCCESS;
 }
 
 int _inst_add(INST_ARG) {
-    int* arg0, arg1;
-    arg0 = getregister(val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-
-    *arg0 += arg1;
+    *getregister(val_arr[0]) += getrvalue(type_arr[1], val_arr[1]);
     return SUCCESS;
 }
 
 int _inst_sub(INST_ARG) {
-    int* arg0, arg1;
-    arg0 = getregister(val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-    
-    *arg0 -= arg1;
+    *getregister(val_arr[0]) -= getrvalue(type_arr[1], val_arr[1]);
     return SUCCESS;
 }
 
 int _inst_mul(INST_ARG) {
-    int* arg0, arg1;
-    arg0 = getregister(val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-    
-    *arg0 *= arg1;
+    *getregister(val_arr[0]) *= getrvalue(type_arr[1], val_arr[1]);
     return SUCCESS;
 }
 
 int _inst_div(INST_ARG) {
-    int* arg0, arg1;
-    arg0 = getregister(val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-    
-    *arg0 /= arg1;
+    *getregister(val_arr[0]) /= getrvalue(type_arr[1], val_arr[1]);
     return SUCCESS;
 }
 
 int _inst_mod(INST_ARG) {
-    int* arg0, arg1;
-    arg0 = getregister(val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-
-    *arg0 %= arg1;
+    *getregister(val_arr[0]) %= getrvalue(type_arr[1], val_arr[1]);
     return SUCCESS;
 }
 
 int _inst_cmp(INST_ARG) {
     int* flg = getregister(FLAG);
-    int arg0, arg1;
+    int result =
+        getrvalue(type_arr[0], val_arr[0]) -
+        getrvalue(type_arr[1], val_arr[1]);
 
-    arg0 = getrvalue(type_arr[0], val_arr[0]);
-    arg1 = getrvalue(type_arr[1], val_arr[1]);
-
-    if (arg0 < arg1) *flg = LESS;
-    else if (arg0 > arg1) *flg = GREAT;
+    if (result > 0) *flg = GREAT;
+    else if (result < 0) *flg = LESS;
     else *flg = EQUAL;
 
     return SUCCESS;
@@ -201,5 +166,42 @@ int _inst_shl(INST_ARG) {
 }
 int _inst_shr(INST_ARG) {
     *getregister(val_arr[0]) >>= getrvalue(type_arr[1], val_arr[1]);
+    return SUCCESS;
+}
+
+int _inst_inc(INST_ARG) {
+    ++*getregister(val_arr[0]);
+    return SUCCESS;
+}
+int _inst_dec(INST_ARG) {
+    --*getregister(val_arr[0]);
+    return SUCCESS;
+}
+int _inst_call(INST_ARG) {
+    pushcallstack(ftell(src_file));
+    fseek(src_file, val_arr[0], SEEK_SET);
+    return SUCCESS;
+}
+int _inst_ret(INST_ARG) {
+    fseek(src_file, popcallstack(), SEEK_SET);
+    return SUCCESS;
+}
+int _inst_push(INST_ARG) {
+    pushstack(getrvalue(type_arr[0], val_arr[0]));
+    return SUCCESS;
+}
+int _inst_pop(INST_ARG) {
+    *getregister(val_arr[0]) = popstack();
+    return SUCCESS;
+}
+int _inst_pushf(INST_ARG) {
+    pushstack(*getregister(FLAG));
+    return SUCCESS;
+}
+int _inst_popf(INST_ARG) {
+    *getregister(val_arr[0]) = *getregister(FLAG);
+    return SUCCESS;
+}
+int _inst_nop(INST_ARG) {
     return SUCCESS;
 }

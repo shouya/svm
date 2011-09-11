@@ -8,7 +8,7 @@
 #define arrlen(arr) (sizeof(arr)/sizeof(*arr))
 
 int __eax, __ebx, __ecx, __edx;
-int __esp, __ebp;
+int* __esp, *__ebp;
 int __eip;
 int __flag;
 
@@ -18,13 +18,16 @@ int __register_list[] = {
 
 int* __register_address_list[] = {
     &__eax, &__ebx, &__ecx, &__edx,
-    &__esp, &__ebp, &__eip, &__flag
+    (int*)&__esp, (int*)&__ebp, &__eip, &__flag
 };
 
 char** __jump_point_name_list = NULL;
 int* __jump_point_position_list = NULL;
 int __jump_point_count = 0;
 
+int* __callstack_base = NULL;
+int __callstack_len = 0;
+int __callstack_allocate = 0;
 
 static const char* l_getname(int val);
 static int l_stricmp(const char* s1, const char* s2);
@@ -93,9 +96,9 @@ int* getregister(int registername) {
     case EDX:
         return &__edx;
     case ESP:
-        return &__esp;
+        return (int*)&__esp;
     case EBP:
-        return &__ebp;
+        return (int*)&__ebp;
     case EIP:
         return &__eip;
     case FLAG:
@@ -104,6 +107,49 @@ int* getregister(int registername) {
         fprintf(stderr, "no such register: %d\n", registername);
         return NULL;
     }
+}
+
+void pushcallstack(int value) {
+    if (__callstack_allocate == 0) {
+        __callstack_allocate = 1;
+        __callstack_base =
+            realloc(__callstack_base, __callstack_allocate * sizeof(int));
+    } else if (__callstack_len + 1 > __callstack_allocate) {
+        ++__callstack_allocate;
+        __callstack_base =
+            realloc(__callstack_base, __callstack_allocate * sizeof(int));
+    }
+    __callstack_base[__callstack_len] = value;
+    ++__callstack_len;
+}
+int popcallstack(void) {
+    if (__callstack_len == 0) {
+        fputs("call stack empty!\n", stderr);
+        return 0;
+    }
+    return __callstack_base[--__callstack_len];
+}
+
+void pushstack(int value) {
+    if (__esp-__ebp >= STACK_SIZE) {
+        fputs("stack over flow!\n", stderr);
+        return;
+    }
+    *(++__esp) = value;
+}
+int popstack(void) {
+    if (__esp <= __ebp) {
+        fputs("stack empty!\n", stderr);
+        return 0;
+    }
+    return (*(__esp--));
+}
+int stacktop(void) {
+    if (__esp <= __ebp) {
+        fputs("stack empty!\n", stderr);
+        return 0;
+    }
+    return *__esp;
 }
 
 int getrvalue(int type, int value) {
@@ -120,9 +166,9 @@ int getrvalue(int type, int value) {
         case EDX:
             return __edx;
         case ESP:
-            return __esp;
+            return (int)__esp;
         case EBP:
-            return __ebp;
+            return (int)__ebp;
         default:
             fprintf(stderr, "no such register: %d\n", value);
             return 0;
@@ -138,6 +184,8 @@ void initregisters(void) {
     for (; i != arrlen(__register_address_list); ++i) {
         *__register_address_list[i] = 0;
     }
+    __ebp = (int*)malloc(STACK_SIZE * sizeof(int));
+    __esp = __ebp;
 }
 
 int parseargument(const char* argument, int* arg_type, int* arg_val) {
@@ -283,12 +331,15 @@ int execfile(FILE* infile) {
     int _inst_argv_len = 0;
 
     char _state = S_NOP;
+    int _startposition = 0;
 
-    fseek(infile, 0, SEEK_SET);
+    _startposition = getjumppoint("start");
+    fseek(infile, _startposition, SEEK_SET);
+
     for (;;) {
         chr = fgetc(infile);
 
-        if (isalnum(chr)) {
+        if (isalnum(chr) || chr == '_') {
             switch (_state) {
             case S_NOP: /* name from new line */
                 _state = S_INST_NAME;
@@ -500,7 +551,7 @@ int l_parse_jmppoint(FILE* infile) {
     for (;;) {
         chr = fgetc(infile);
 
-        if (isalnum(chr)) {
+        if (isalnum(chr) || chr == '_') {
             switch (_state) {
             case S_NOP: /* name from new line */
                 _state = S_INST_NAME;

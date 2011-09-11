@@ -1,0 +1,5 @@
+currently do not support:
+* HEX number (0xxxxxx)/(xxxx|h)
+* Binary (0bxxxxx)/(xxxxx|b)
+* rem instruction
+* couples register named: esi, edi

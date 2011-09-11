@@ -5,6 +5,7 @@
 
 #define MAX_ARGC 10
 #define BUF_SIZE 64
+#define STACK_SIZE 32
 
 #define SUCCESS (0)
 #define FAILURE (-1)
@@ -31,6 +32,11 @@
 int* getregister(int registername);
 int getrvalue(int type, int value);
 int getjumppoint(const char* name);
+void pushcallstack(int value);
+int popcallstack(void);
+void pushstack(int value);
+int popstack(void);
+int stacktop(void);
 
 int execfile(FILE* infile);
 int execinst(const char* name, int argc, char* const* argv, FILE* srcfile);

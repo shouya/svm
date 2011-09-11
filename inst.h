@@ -21,7 +21,7 @@ typedef struct inst_t {
 
 extern inst_t __inst[];
 
-#define INST_COUNT 22 /*(sizeof(__inst)/sizeof(*__inst))*/
+#define INST_COUNT 31 /*(sizeof(__inst)/sizeof(*__inst))*/
 
 DECL_INST(mov);
 DECL_INST(prn);
@@ -45,6 +45,14 @@ DECL_INST(or);
 DECL_INST(xor);
 DECL_INST(shl);
 DECL_INST(shr);
-
+DECL_INST(inc);
+DECL_INST(dec);
+DECL_INST(call);
+DECL_INST(ret);
+DECL_INST(push);
+DECL_INST(pop);
+DECL_INST(pushf);
+DECL_INST(popf);
+DECL_INST(nop);
 
 #endif /* __INST_H__ */
