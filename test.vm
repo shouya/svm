@@ -3,10 +3,12 @@ prn eax
 ; a '\n'
 pchr 10
 ; the following characters is string "Mutation"
+jmp tion
 pchr 77
 pchr 117
 pchr 116
 pchr 97
+tion: ; print 'tion'
 pchr 116
 pchr 105
 pchr 111

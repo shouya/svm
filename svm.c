@@ -28,7 +28,7 @@ static const char* l_getname(int val);
 static int l_stricmp(const char* s1, const char* s2);
 static void reset_name(char* name, int* length);
 static void reset_argument(int* argc, char** argv, int* argvlen);
-static void l_parse_jmppoint(FILE* infile);
+static int l_parse_jmppoint(FILE* infile);
 
 /*static*/ const char* l_getname(int val) {
     switch (val) {
@@ -157,6 +157,7 @@ int parseargument(const char* argument, int* arg_type, int* arg_val) {
         }
     }
 
+
     /* check if == numeric */
     i = (argument[0] == '-' ? 1 : 0);
     for (; i != strlen(argument); ++i) {
@@ -187,7 +188,7 @@ int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
         }
     }
     if (func == NULL) {
-        fputs("no match function name found.]n", stderr);
+        fputs("no match function name found.\n", stderr);
         return FAILURE;
     }
 
@@ -235,6 +236,7 @@ int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
 #define S_INST_ARG 2
 #define S_INST_ARG_BEG 3
 #define S_COMMENT 4
+#define S_UNKNOWN (-1)
 
 /*static*/ void reset_name(char* name, int* length) {
     name[0] = '\0';
@@ -374,7 +376,7 @@ int execfile(FILE* infile) {
             case S_INST_ARG: /* [mov eax,] */
                 _state = S_INST_ARG_BEG;
                 _inst_argv[_inst_argc - 1][_inst_argv_len] = '\0';
-                break;p
+                break;
             case S_COMMENT:
                 break;
             case S_INST_ARG_BEG: /* [mov ,] or [mov eax,,] */
@@ -462,12 +464,14 @@ int execfile(FILE* infile) {
         } else {
             if (_state != S_COMMENT) {
                 fprintf(stderr, "unknown character: %d[%c]", chr, chr);
-            }
-        }
-    }
-}
+            } /* if */
+        } /* else */
+    } /* for */
 
-void l_parse_jmppoint(FILE* infile) {
+    return SUCCESS;
+} /* function execfile */
+
+int l_parse_jmppoint(FILE* infile) {
     int chr = 0;
     char* _inst_name = malloc(BUF_SIZE);
     int _inst_name_len = 0;
@@ -485,7 +489,25 @@ void l_parse_jmppoint(FILE* infile) {
                 _inst_name_len = 1;
                 break;
             case S_INST_NAME: /* store new char into name buffer */
+                if (_inst_name_len == BUF_SIZE - 1) {
+                    fputs("the jump point's name is too long.\n", stderr);
+                    free(_inst_name);
+                    return FAILURE;
+                }
                 _inst_name[_inst_name_len++] = chr;
+                break;
+            case S_UNKNOWN:
+                break;
+            }
+        } else if (isspace(chr)) {
+            switch (_state) {
+            case S_INST_NAME:
+                //_state = S_UNKNOWN;
+                _inst_name[0] = '\0';
+                _inst_name_len = 0;
+                break;
+            case S_UNKNOWN:
+            case S_NOP:
                 break;
             }
         } else if (chr == ':') {
@@ -508,11 +530,18 @@ void l_parse_jmppoint(FILE* infile) {
                 ++__jump_point_count;
 
                 _inst_name_len = 0;
+                break;
+            case S_NOP:
+            case S_UNKNOWN:
+                break;
             } /* switch */
         } else if (chr == EOF) {
             break;
-        } /* else if EOF */
+        } else if (chr != '\n') {
+            _state = S_NOP;
+        } /* if */
     } /* for (;;) */
+    return SUCCESS;
 }
 
 int getjumppoint(const char* name) {

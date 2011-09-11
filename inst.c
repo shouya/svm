@@ -9,7 +9,8 @@
 char* __inst_name[] = {
     "mov",
     "prn",
-    "pchr"
+    "pchr",
+    "jmp"
 };
 
 instruction_t __inst_callback[] = {
