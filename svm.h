@@ -1,6 +1,8 @@
 #ifndef __SVM_H__
 #define __SVM_H__
 
+#include "inst.h"
+
 #define MAX_ARGC 10
 #define BUF_SIZE 64
 
@@ -19,10 +21,12 @@
 
 #define ESP (-5)
 #define EBP (-6)
+#define EIP (-7)
+#define FLAG (-8)
 
-
-#include "inst.h"
-
+#define LESS (-1)
+#define GREAT (1)
+#define EQUAL (0)
 
 int* getregister(int registername);
 int getrvalue(int type, int value);

@@ -3,21 +3,48 @@
 
 #define INST_ARG int argc, int* type_arr, int* val_arr,\
                  FILE* src_file, int* reserve
+#define DECL_INST(name) int _inst_##name(INST_ARG);
 
 typedef int (*instruction_t)(INST_ARG);
-    
 
-int _inst_mov(INST_ARG);
-int _inst_prn(INST_ARG);
-int _inst_pchr(INST_ARG);
-int _inst_jmp(INST_ARG);
+typedef struct inst_t {
+    int instno;
+    const char* name;
+    instruction_t callback;
+    /*
+     * r -- register
+     * v -- register or a numeric lexical
+     * j -- jump point
+     */
+    const char* argument;
+} inst_t;
 
-/* modify following 3 arrays and the count variable to add/del instructions */
-/* in the source file */
-extern char* __inst_name[];
-extern instruction_t __inst_callback[];
-extern char* __inst_arg[];
-extern int __inst_count;
+extern inst_t __inst[];
+
+#define INST_COUNT 22 /*(sizeof(__inst)/sizeof(*__inst))*/
+
+DECL_INST(mov);
+DECL_INST(prn);
+DECL_INST(pchr);
+DECL_INST(jmp);
+DECL_INST(add);
+DECL_INST(sub);
+DECL_INST(mul);
+DECL_INST(div);
+DECL_INST(mod);
+DECL_INST(cmp);
+DECL_INST(je);
+DECL_INST(jne);
+DECL_INST(jg);
+DECL_INST(jge);
+DECL_INST(jl);
+DECL_INST(jle);
+DECL_INST(not);
+DECL_INST(and);
+DECL_INST(or);
+DECL_INST(xor);
+DECL_INST(shl);
+DECL_INST(shr);
 
 
 #endif /* __INST_H__ */

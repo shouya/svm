@@ -9,14 +9,16 @@
 
 int __eax, __ebx, __ecx, __edx;
 int __esp, __ebp;
+int __eip;
+int __flag;
 
 int __register_list[] = {
-    EAX, EBX, ECX, EDX, ESP, EBP
+    EAX, EBX, ECX, EDX, ESP, EBP, EIP, FLAG
 };
 
 int* __register_address_list[] = {
     &__eax, &__ebx, &__ecx, &__edx,
-    &__esp, &__ebp
+    &__esp, &__ebp, &__eip, &__flag
 };
 
 char** __jump_point_name_list = NULL;
@@ -52,6 +54,10 @@ static int l_parse_jmppoint(FILE* infile);
         return "ESP";
     case EBP:
         return "EBP";
+    case EIP:
+        return "EIP";
+    case FLAG:
+        return "FLAG";
     default:
         fprintf(stderr, "error: get name of %d error, no such symbol name.\n",
                 val);
@@ -60,10 +66,19 @@ static int l_parse_jmppoint(FILE* infile);
 }
 
 /*static*/ int l_stricmp(const char* s1, const char* s2) {
-    while ((tolower(*s1++) == tolower(*s2++)) &&
-           (*s1 != '\0') &&
-           (*s2 != '\0'));
-    return (tolower(*s1) - tolower(*s2));
+    /* BUG: compare via 'tion' and 'EIX' returns 0?? */
+    for (;;) {
+        if (*s1 == 0 && *s2 != 0) return (-1);
+        else if (*s1 != 0 && *s2 == 0) return (1);
+        else if (*s1 == 0 && *s2 == 0) return (0);
+        else if (tolower(*s1) < tolower(*s2)) return (-1);
+        else if (tolower(*s1) > tolower(*s2)) return (1);
+        else {
+            s1++, s2++;
+        }
+    }
+    /* impossible launch to here */
+    return 0;
 }
 
 
@@ -81,8 +96,12 @@ int* getregister(int registername) {
         return &__esp;
     case EBP:
         return &__ebp;
+    case EIP:
+        return &__eip;
+    case FLAG:
+        return &__flag;
     default:
-        fprintf(stderr, "no such regisppter: %d\n", registername);
+        fprintf(stderr, "no such register: %d\n", registername);
         return NULL;
     }
 }
@@ -117,7 +136,6 @@ int getrvalue(int type, int value) {
 void initregisters(void) {
     int i = 0;
     for (; i != arrlen(__register_address_list); ++i) {
-
         *__register_address_list[i] = 0;
     }
 }
@@ -148,6 +166,7 @@ int parseargument(const char* argument, int* arg_type, int* arg_val) {
         }
     }
 
+    
     /* check if == jump point name */
     for (i = 0; i != __jump_point_count; ++i) {
         if (!l_stricmp(__jump_point_name_list[i], argument)) {
@@ -176,23 +195,23 @@ int parseargument(const char* argument, int* arg_type, int* arg_val) {
 }
 
 int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
-    int func_no = 0;
-    instruction_t func = NULL;
+    int _instno = 0;
+    instruction_t _callback = NULL;
     int* type_arr, *val_arr;
     int argi = 0;
 
-    for (; func_no != __inst_count; ++func_no) {
-        if (!l_stricmp(name, __inst_name[func_no])) {
-            func = __inst_callback[func_no];
+    for (; _instno != INST_COUNT; ++_instno) {
+        if (!l_stricmp(name, __inst[_instno].name)) {
+            _callback = __inst[_instno].callback;
             break;
         }
     }
-    if (func == NULL) {
-        fputs("no match function name found.\n", stderr);
+    if (_callback == NULL) {
+        fprintf(stderr, "no match function [%s] found.\n", name);
         return FAILURE;
     }
 
-    if (argc > 0 && argc != strlen(__inst_arg[func_no])) {
+    if (argc > 0 && argc != strlen(__inst[_instno].argument)) {
         fputs("argument count not matched.\n", stderr);
         return FAILURE;
     }
@@ -202,7 +221,7 @@ int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
     type_arr = (int*)malloc(sizeof(int) * argc);
     
 /*
-    if (__inst_arg_count[func_no] != -1) {
+    if (__inst_arg_count[_instno] != -1) {
     } else {
         / * TODO * /
         fputs("incomplete function: variable argument instruction.\n", stderr);
@@ -213,7 +232,7 @@ int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
         parseargument(argv[argi], &type_arr[argi], &val_arr[argi]);
     }
 
-    if (checkarg(__inst_arg[func_no], argc,
+    if (checkarg(__inst[_instno].argument, argc,
                  type_arr, val_arr) != SUCCESS) {
         fputs("check argument failed\n", stderr);
         free(type_arr);
@@ -221,7 +240,7 @@ int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
         return FAILURE;
     }
     
-    (*func)(argc, type_arr, val_arr, srcfile, 0);
+    (*_callback)(argc, type_arr, val_arr, srcfile, 0);
 
     free(val_arr);
     free(type_arr);
