@@ -38,6 +38,25 @@ void pushstack(int value);
 int popstack(void);
 int stacktop(void);
 
+/**
+ * parse file into binary instructions
+ * @infile: input file
+ * @output: pass in a pointer to char*, this function will assign it
+ * @length: length of binary instructions
+ * returns SUCCESS/FAILURE
+ */
+int parsefile(FILE* infile, int** output, int* length);
+/**
+ * translate sigle instruction into binary
+ * @name: instuction's name
+ * @argc: arguments count
+ * @argv: values of arguments
+ * @out: output instruction translated
+ * returns the instruction's length
+ */
+int translateinst(const char* name, int argc, char* const* argv, int* out);
+int execute(const char* insts, int len);
+
 int execfile(FILE* infile);
 int execinst(const char* name, int argc, char* const* argv, FILE* srcfile);
 int checkarg(const char* argtype, int argc, int* type_arr, int* val_arr);

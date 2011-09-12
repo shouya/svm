@@ -241,6 +241,73 @@ int parseargument(const char* argument, int* arg_type, int* arg_val) {
 
     return FAILURE;
 }
+int translateinst(const char* name, int argc, char* const* argv, char* out) {
+    int _instno = 0;
+    instruction_t _callback = NULL;
+    int* type_arr, *val_arr;
+    int argi = 0;
+    int len = 0;
+
+    for (; _instno != INST_COUNT; ++_instno) {
+        if (!l_stricmp(name, __inst[_instno].name)) {
+            _callback = __inst[_instno].callback;
+            break;
+        }
+    }
+
+    if (_callback == NULL) {
+        fprintf(stderr, "no match function [%s] found.\n", name);
+        return FAILURE;
+    }
+
+    if (argc > 0 && argc != strlen(__inst[_instno].argument)) {
+        fputs("argument count not matched.\n", stderr);
+        return FAILURE;
+    }
+
+    val_arr = (int*)malloc(sizeof(int) * argc);
+    type_arr = (int*)malloc(sizeof(int) * argc);
+    
+    for (; argi != argc; ++argi) {
+        parseargument(argv[argi], &type_arr[argi], &val_arr[argi]);
+    }
+
+    if (checkarg(__inst[_instno].argument, argc,
+                 type_arr, val_arr) != SUCCESS) {
+        fputs("check argument failed\n", stderr);
+        free(type_arr);
+        free(val_arr);
+        return FAILURE;
+    }
+
+    ++len;
+    *out++ = _instno;
+    for (argi = 0; argi != argc; ++argi) {
+        switch(__inst[_instno].argument[argi]) {
+        case 'r':
+            *out++ = val_arr[argi];
+            ++len;
+            break;
+        case 'v':
+            *out++ = type_arr[argi];
+            *out++ = val_arr[argi];
+            ++++len;
+            break;
+        case 'j':
+            *out++ = val_arr[argi];
+            ++len;
+            break;
+        default:
+            /* no possible */
+            break;
+        } /* switch */
+    } /* for each argument */
+
+    free(val_arr);
+    free(type_arr);
+
+    return len;
+}
 
 int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
     int _instno = 0;
@@ -320,7 +387,8 @@ int execinst(const char* name, int argc, char* const* argv, FILE* srcfile) {
     *argc = *argvlen = 0;
 }
 
-int execfile(FILE* infile) {
+/*int execfile(FILE* infile) {*/
+int parsefile(FILE* infile, int** output, int* length) {
     int chr = 0;
     int _line = 1;
 
@@ -332,6 +400,10 @@ int execfile(FILE* infile) {
 
     char _state = S_NOP;
     int _startposition = 0;
+
+    int _total_len = 0;
+    int _alloc_len = BUF_SIZE * 5;
+    int* _out = malloc(_alloc_len * sizeof(int));
 
     _startposition = getjumppoint("start");
     fseek(infile, _startposition, SEEK_SET);
@@ -385,13 +457,26 @@ int execfile(FILE* infile) {
             case S_INST_NAME: /* execute simple instruction, such as ret */
                 _state = S_NOP;
                 _inst_name[_inst_name_len] = '\0';
-                execinst(_inst_name, 0 /*argc*/, NULL /*argv*/, infile);
+                /* execinst(_inst_name, 0, NULL, infile); */
+                _total_len += translateinst(_inst_name, 0, NULL,
+                                            &_out[_total_len]);
+                /* always reserve a BUF_SIZE space to new instructions */
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
                 reset_name(_inst_name, &_inst_name_len);
                 break;
             case S_INST_ARG:
                 _state = S_NOP;
                 _inst_argv[_inst_argc - 1][_inst_argv_len] = '\0';
-                execinst(_inst_name, _inst_argc, _inst_argv, infile);
+                _total_len += translateinst(_inst_name, _inst_argc, _inst_argv,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*                execinst(_inst_name, _inst_argc, _inst_argv, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 reset_argument(&_inst_argc, _inst_argv, &_inst_argv_len);
                 break;
@@ -407,7 +492,13 @@ int execfile(FILE* infile) {
                     return FAILURE;
                 }
                 /* such as [nop \n] */
-                execinst(_inst_name, 0 /*argc*/, NULL /*argv*/, infile);
+                _total_len += translateinst(_inst_name, 0, NULL,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+                /*execinst(_inst_name, 0, NULL, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 break;
             }
@@ -463,13 +554,25 @@ int execfile(FILE* infile) {
             case S_INST_NAME: /* [nop; some comments] */
                 _state = S_COMMENT;
                 _inst_name[_inst_name_len] = '\0';
-                execinst(_inst_name, 0 /*argc*/, NULL/*argv*/, infile);
+                _total_len += translateinst(_inst_name, 0, NULL,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*                execinst(_inst_name, 0, NULL, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 break;
             case S_INST_ARG:
                 _state = S_COMMENT;
                 _inst_argv[_inst_argc - 1][_inst_argv_len] = '\0';
-                execinst(_inst_name, _inst_argc, _inst_argv, infile);
+                _total_len += translateinst(_inst_name, _inst_argc, _inst_argv,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*                execinst(_inst_name, _inst_argc, _inst_argv, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 reset_argument(&_inst_argc, _inst_argv, &_inst_argv_len);
                 break;
@@ -483,7 +586,13 @@ int execfile(FILE* infile) {
                     return FAILURE;
                 }
                 /* such as [nop ;] */
-                execinst(_inst_name, 0 /*argc*/, NULL /*argv*/, infile);
+                _total_len += translateinst(_inst_name, 0, NULL,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*                execinst(_inst_name, 0, NULL, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 break;
             }
@@ -491,14 +600,26 @@ int execfile(FILE* infile) {
             switch (_state) {
             case S_NOP:
                 break;
-            case S_INST_NAME: /* [nop; some comments] */
+            case S_INST_NAME: /* [nop] */
                 _inst_name[_inst_name_len] = '\0';
-                execinst(_inst_name, 0 /*argc*/, NULL/*argv*/, infile);
+                _total_len += translateinst(_inst_name, 0, NULL,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*                execinst(_inst_name, 0, NULL, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 break;
             case S_INST_ARG:
                 _inst_argv[_inst_argc - 1][_inst_argv_len] = '\0';
-                execinst(_inst_name, _inst_argc, _inst_argv, infile);
+                _total_len += translateinst(_inst_name, _inst_argc, _inst_argv,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*                execinst(_inst_name, _inst_argc, _inst_argv, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 reset_argument(&_inst_argc, _inst_argv, &_inst_argv_len);
                 break;
@@ -510,7 +631,14 @@ int execfile(FILE* infile) {
                     free(_inst_name);
                     return FAILURE;
                 }
-                execinst(_inst_name, 0 /*argc*/, NULL /*argv*/, infile);
+                _total_len += translateinst(_inst_name, 0, NULL,
+                                            &_out[_total_len]);
+                if (_total_len + BUF_SIZE >= _alloc_len) {
+                    _alloc_len *= 2;
+                    _out = realloc(_out, _alloc_len * sizeof(int));
+                }
+/*
+                execinst(_inst_name, 0, NULL, infile);*/
                 reset_name(_inst_name, &_inst_name_len);
                 break;
             }
@@ -540,6 +668,7 @@ int execfile(FILE* infile) {
 
     return SUCCESS;
 } /* function execfile */
+
 
 int l_parse_jmppoint(FILE* infile) {
     int chr = 0;
