@@ -1,7 +1,17 @@
 	mov eax, 0
+        mov ebx, 0
+        mov ecx, 0
 
 loop:
 	nop
 	inc eax
 	cmp eax, 1000000
 	jl loop
+
+        nop
+        xor eax, eax
+        inc ebx
+        cmp ebx, 100
+        jl loop
+
+        prn 600

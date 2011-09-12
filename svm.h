@@ -29,7 +29,8 @@ void init_registers(void);
 int inst_len(const char* name);
 int parse_jmplbl(FILE* infile);
 int parse_file(FILE* infile, int** output);
-int exec_binary(int* bin, int len);
+int parse_arg(int type_chr, const char* text, int* bin_ptr);
+int exec_binary(int* bin, int len, int startpoint);
 
 int* get_register(int reg_no);
 int get_rvalue(int type, int val);

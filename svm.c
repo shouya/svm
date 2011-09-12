@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "svm.h"
 
@@ -12,10 +13,17 @@ int __program_len = 0;
 int __eax, __ebx, __ecx, __edx, __esi, __edi;
 int *__esp, *__ebp;
 int __eip;
+int __flag;
 
 int* __callstack_base = 0;
 int* __callstack_top = 0;
 
+static int typechr_len(int chr) {
+    if (chr == 'r') return 1;
+    if (chr == 'v') return 2;
+    if (chr == 'j') return 3;
+    return 0;
+}
 
 static int name_to_reg(const char* name) {
     if (!util_stricmp(name, "eax")) {
@@ -36,8 +44,10 @@ static int name_to_reg(const char* name) {
         return R_EBP;
     } else if (!util_stricmp(name, "eip")) {
         return R_EIP;
+    } else if (!util_stricmp(name, "flag")) {
+        return R_FLAG;
     } else {
-        fprintf(stderr, "unkown register name: [%s]\n", name);
+/*        fprintf(stderr, "unknown register name: [%s]\n", name);*/
         return 0;
     }
 }
@@ -62,7 +72,7 @@ static void reset_argument(int* argc, char** argv, int* argvlen) {
 int* get_register(int reg_no) {
     static int* s_reg_arr[] = {
         &__eax, &__ebx, &__ecx, &__edx, &__esi, &__edi,
-        (int*)&__esp, (int*)&__ebp, &__eip
+        (int*)&__esp, (int*)&__ebp, &__eip, &__flag
     };
     return (s_reg_arr[(-reg_no) - 1]);
 }
@@ -73,7 +83,7 @@ int get_rvalue(int type, int val) {
     } else if (type == T_VAL) {
         return val;
     } else {
-        fprintf(stderr, "unkown type: %d\n", type);
+        fprintf(stderr, "unknown type: %d\n", type);
         return FAILURE;
     }
 }
@@ -89,7 +99,7 @@ void push_callstack(int pos) {
 int pop_callstack(void) {
     if (__callstack_top - __callstack_base == 0) { 
         fputs("callstack empty!\n", stderr);
-        return;
+        return FAILURE;
     }
     return (*(--__callstack_top));
 }
@@ -110,11 +120,11 @@ void push_stack(int val) {
 int pop_stack(void) {
     if (__esp < __ebp) {
         fputs("stack pointer error!\n", stderr);
-        return;
+        return FAILURE;
     }
     if (__esp == __ebp) {
         fputs("stack empty!\n", stderr);
-        return;
+        return FAILURE;
     }
     return (*(--__esp));
 }
@@ -126,7 +136,7 @@ int arg_len(int instno) {
     int len = 0;
     
     for (; i != arglen; ++i) {
-        if (__inst[instno].argument[i] == 'r') {
+        if (__inst[instno].argument[i] == 'v') {
             len += 2;
         } else {
             ++len;
@@ -136,7 +146,7 @@ int arg_len(int instno) {
 }
 
 int inst_len(const char* name) {
-    int i = 0, j = 0, arglen, len;
+    int i = 0;
     for (; i != INST_COUNT; ++i) {
         if (!util_stricmp(__inst[i].name, name)) {
             /* argument's length & instruction's length(1) */
@@ -202,6 +212,15 @@ int parse_jmplbl(FILE* infile) {
             case S_UNKNOWN:
                 break;
             }
+        } else if (chr == '\n') {
+            if (_state == S_INST_NAME) {
+                _state = S_UNKNOWN;
+                _inst_name[_inst_name_len] = '\0';
+                __program_len += inst_len(_inst_name);
+                _inst_name[0] = '\0';
+                _inst_name_len = 0;
+            }
+            _state = S_NOP;
         } else if (isspace(chr)) {
             switch (_state) {
             case S_INST_NAME:
@@ -229,6 +248,11 @@ int parse_jmplbl(FILE* infile) {
                     malloc(_inst_name_len);
                 strcpy(__jmp_tbl[__jmp_tbl_size-1].name, _inst_name);
                 __jmp_tbl[__jmp_tbl_size-1].jmppos = __program_len;
+/* DEBUG
+                printf("jp[%d]: [%s] -- [%d]\n", __jmp_tbl_size - 1,
+                       __jmp_tbl[__jmp_tbl_size-1].name,
+                    __jmp_tbl[__jmp_tbl_size-1].jmppos);
+*/
                 
                 _inst_name[0] = '\0';
                 _inst_name_len = 0;
@@ -239,9 +263,9 @@ int parse_jmplbl(FILE* infile) {
             } /* switch */
         } else if (chr == EOF) {
             break;
-        } else if (chr != '\n') {
-            _state = S_NOP;
-        } /* if */
+        } else {
+            _state = S_UNKNOWN;
+        }/* if */
     } /* for (;;) */
     return SUCCESS;
 }
@@ -380,6 +404,7 @@ int sm_comma(SM_ARGS) {
         fprintf(stderr, "syntax error at line %d\n", line);
         return FAILURE;
     }
+    return SUCCESS;
 }
 int sm_colon(SM_ARGS) {
     switch (*state) {
@@ -515,7 +540,7 @@ int parse_file(FILE* infile, int** output) {
     int _pos = 0;
     int* _bin = malloc(__program_len * sizeof(int));
 
-
+    fseek(infile, 0, SEEK_SET);
     for (;;) {
         _chr = fgetc(infile);
 #define CALL_SM(sm_name) if (                                           \
@@ -536,17 +561,23 @@ int parse_file(FILE* infile, int** output) {
             CALL_SM(sm_semicolon);
         } else if (_chr == EOF) {
             CALL_SM(sm_eof);
-            return SUCCESS;
+            goto success_return;
         } else if (_chr == ':') {
             CALL_SM(sm_colon);
         } else {
             if (_state != S_COMMENT) {
                 fprintf(stderr, "unknown character: %d[%c]", _chr, _chr);
+                goto free_and_return;
             } /* if */
         } /* else */
 #undef CALL_SM
     } /* for */
 
+
+    return FAILURE;
+
+success_return:
+    *output = _bin;
     return SUCCESS;
 
 free_and_return:
@@ -555,13 +586,31 @@ free_and_return:
     return FAILURE;
 }
 
-int exec_binary(int* bin, int len) {
+int exec_binary(int* bin, int len, int startpos) {
     instruction_t _inst;
     int _args[MAX_ARGC*2];
-    int* _p = bin;
+    int* _p = bin + startpos;
     int i, _arglen;
 
     for (;;) {
+        if (_p - bin == len) {
+            break;
+        }
+        
+/* DEBUG
+        printf("[%s](%d,%d,%d,%d)-[%d]\t",
+               __inst[*_p].name, _p[1], _p[2], _p[3], _p[4], _p - bin);
+        printf("eax-edx: %d %d %d %d, esp-ebp: %d\n",
+               __eax, __ebx, __ecx, __edx,
+               __esp - __ebp);
+        if (*_p == 9) {
+            printf("cmp result: %s\n",
+                   __flag == LESS ? "LESS":
+                   __flag == GREAT ? "GREAT":
+                   __flag == EQUAL ? "EQUAL":
+                   "ELSE");
+        }
+*/
         _inst = __inst[*_p].callback; /* inst no */
         _arglen = arg_len(*_p++); /* inst no -> arg */
         for (i = 0; i != _arglen; ++i) {
@@ -569,12 +618,12 @@ int exec_binary(int* bin, int len) {
         }
         (*_inst)(_args, &bin, &_p);
     }
+    return SUCCESS;
 }
 
 int trans_inst(const char* name, int argc, char* const* argv, int* bin_ptr) {
     int _instno = 0;
-    int* type_arr, *val_arr;
-    int _argi = 0, inst_len = 0;
+    int _argi = 0;
     int _parg = 0;
 
     for (; _instno != INST_COUNT; ++_instno) {
@@ -601,6 +650,7 @@ int trans_inst(const char* name, int argc, char* const* argv, int* bin_ptr) {
             fputs("argument parse error.\n", stderr);
             return FAILURE;
         }
+        bin_ptr += typechr_len(__inst[_instno].argument[_argi]);
     }
 
     return (arg_len(_instno) + 1);
@@ -631,7 +681,7 @@ int parse_arg(int type_chr, const char* text, int* bin_ptr) {
     case 'j':
         *bin_ptr = -1;
         for (; i != __jmp_tbl_size; ++i) {
-            if (util_stricmp(__jmp_tbl[i].name, text)) {
+            if (!util_stricmp(__jmp_tbl[i].name, text)) {
                 *bin_ptr = __jmp_tbl[i].jmppos;
                 return 1;
             }
@@ -640,7 +690,7 @@ int parse_arg(int type_chr, const char* text, int* bin_ptr) {
         return FAILURE;
     }
 
-    /* unkown type char */
+    /* unknown type char */
     fprintf(stderr, "unknown type character: [%c]\n", type_chr);
     return FAILURE;
 }
@@ -656,13 +706,16 @@ void init_registers(void) {
 
 int main(int argc, char** argv) {
     static FILE* _input_file;
-    static int* _binary;
+    static int* _binary = NULL;
     int retval = 0;
+    int _startpos = 0;
+    int i = 0;
 
     if (argc > 1) {
         _input_file = fopen(argv[1], "r");
         if (!_input_file) {
             fprintf(stderr, "open file failed: [%s]", argv[1]);
+            exit(EXIT_FAILURE);
         }
     } else {
         _input_file = stdin;
@@ -677,15 +730,27 @@ int main(int argc, char** argv) {
         goto free_and_exit;
     }
 
+    for (; i != __jmp_tbl_size; ++i) {
+        if (!util_stricmp(__jmp_tbl[i].name, "start")) {
+            _startpos = __jmp_tbl[i].jmppos;
+        }
+    }
+
     free(__jmp_tbl);
     init_registers();
 
-    if (exec_binary(_binary, __program_len) == FAILURE) {
+/*    for (i = 0; i != __program_len; ++i) {
+        printf("[%02d]get a: %d\n", i, _binary[i]);
+    }
+*/
+    //  exit(0);
+
+    if (exec_binary(_binary, __program_len, _startpos) == FAILURE) {
         fputs("error at executing\n", stderr);
+        free(_binary);
         goto free_and_exit;
     }
-
-/*    retval = execfile(_input_file);*/
+    free(_binary);
 
     if (_input_file != stdin) {
         fclose(_input_file);

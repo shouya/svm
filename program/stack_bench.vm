@@ -2,10 +2,11 @@ start:	mov eax, 15
 	mov ebx, 0
 
 loop0:	
-	push 0
+	push ebx
 	inc ebx
 	cmp ebx, eax
 	prn ebx
+        pchr 10
 	jne loop0
 
 loop1:	
@@ -13,4 +14,5 @@ loop1:
 	dec ebx
 	cmp ebx, 0
 	prn ebx
+        pchr 10
 	jne loop1

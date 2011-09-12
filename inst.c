@@ -97,7 +97,7 @@ int _inst_mod(INST_ARG) {
 
 int _inst_cmp(INST_ARG) {
     int* flg = get_register(R_FLAG);
-    int result = get_rvalue(arg[0], arg[1]) - get_rvalue(arg[2], arg[2]);
+    int result = get_rvalue(arg[0], arg[1]) - get_rvalue(arg[2], arg[3]);
 
     if (result > 0) *flg = GREAT;
     else if (result < 0) *flg = LESS;
@@ -177,7 +177,7 @@ int _inst_dec(INST_ARG) {
     return SUCCESS;
 }
 int _inst_call(INST_ARG) {
-    push_callstack(cur_ptr - base_ptr);
+    push_callstack(*cur_ptr - *base_ptr);
     _inst_jmp(arg, base_ptr, cur_ptr);
     return SUCCESS;
 }

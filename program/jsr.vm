@@ -6,6 +6,7 @@ print_eax:
 start:
 	mov eax, 42
 	call print_eax
-
+call_ret1:
 	mov eax, 23
 	call print_eax
+call_ret2:
