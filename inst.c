@@ -5,6 +5,7 @@
 
 #include "inst.h"
 #include "svm.h"
+#include "def.h"
 
 
 inst_t __inst[] = {
@@ -50,55 +51,53 @@ inst_t __inst[] = {
 
 
 int _inst_mov(INST_ARG) {
-    *getregister(val_arr[0]) = getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) = get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
  
 int _inst_prn(INST_ARG) {
-    printf("%d", getrvalue(type_arr[0], val_arr[0]));
+    printf("%d", get_rvalue(arg[0], arg[1]));
     return SUCCESS;
 }
 
 int _inst_pchr(INST_ARG) {
-    putchar(getrvalue(type_arr[0], val_arr[0]));
+    putchar(get_rvalue(arg[0], arg[1]));
     return SUCCESS;
 }
 
 int _inst_jmp(INST_ARG) {
-    fseek(src_file, val_arr[0], SEEK_SET);
+    *cur_ptr = *base_ptr + arg[0];
     return SUCCESS;
 }
 
 int _inst_add(INST_ARG) {
-    *getregister(val_arr[0]) += getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) += get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 
 int _inst_sub(INST_ARG) {
-    *getregister(val_arr[0]) -= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) -= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 
 int _inst_mul(INST_ARG) {
-    *getregister(val_arr[0]) *= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) *= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 
 int _inst_div(INST_ARG) {
-    *getregister(val_arr[0]) /= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) /= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 
 int _inst_mod(INST_ARG) {
-    *getregister(val_arr[0]) %= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) %= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 
 int _inst_cmp(INST_ARG) {
-    int* flg = getregister(FLAG);
-    int result =
-        getrvalue(type_arr[0], val_arr[0]) -
-        getrvalue(type_arr[1], val_arr[1]);
+    int* flg = get_register(R_FLAG);
+    int result = get_rvalue(arg[0], arg[1]) - get_rvalue(arg[2], arg[2]);
 
     if (result > 0) *flg = GREAT;
     else if (result < 0) *flg = LESS;
@@ -108,98 +107,99 @@ int _inst_cmp(INST_ARG) {
 }
 
 int _inst_je(INST_ARG) {
-    if (*getregister(FLAG) == EQUAL) {
-        fseek(src_file, val_arr[0], SEEK_SET);
+    if (*get_register(R_FLAG) == EQUAL) {
+        _inst_jmp(arg, base_ptr, cur_ptr);
     }
     return SUCCESS;
 }
 int _inst_jne(INST_ARG) {
-    if (*getregister(FLAG) != EQUAL) {
-        fseek(src_file, val_arr[0], SEEK_SET);
+    if (*get_register(R_FLAG) != EQUAL) {
+        _inst_jmp(arg, base_ptr, cur_ptr);
     }
     return SUCCESS;
 }
 int _inst_jg(INST_ARG) {
-    if (*getregister(FLAG) == GREAT) {
-        fseek(src_file, val_arr[0], SEEK_SET);
+    if (*get_register(R_FLAG) == GREAT) {
+        _inst_jmp(arg, base_ptr, cur_ptr);
     }
     return SUCCESS;
 }
 int _inst_jge(INST_ARG) {
-    if (*getregister(FLAG) == EQUAL || *getregister(FLAG) == GREAT) {
-        fseek(src_file, val_arr[0], SEEK_SET);
+    if (*get_register(R_FLAG) == EQUAL || *get_register(R_FLAG) == GREAT) {
+        _inst_jmp(arg, base_ptr, cur_ptr);
     }
     return SUCCESS;
 }
 int _inst_jl(INST_ARG) {
-    if (*getregister(FLAG) == LESS) {
-        fseek(src_file, val_arr[0], SEEK_SET);
+    if (*get_register(R_FLAG) == LESS) {
+        _inst_jmp(arg, base_ptr, cur_ptr);
     }
     return SUCCESS;
 }
 int _inst_jle(INST_ARG) {
-    if (*getregister(FLAG) == EQUAL || *getregister(FLAG) == LESS) {
-        fseek(src_file, val_arr[0], SEEK_SET);
+    if (*get_register(R_FLAG) == EQUAL || *get_register(R_FLAG) == LESS) {
+        _inst_jmp(arg, base_ptr, cur_ptr);
     }
     return SUCCESS;
 }
 int _inst_not(INST_ARG) {
-    int* val = getregister(val_arr[0]);
+    int* val = get_register(arg[0]);
     *val = ~*val;
     return SUCCESS;
 }
 int _inst_and(INST_ARG) {
-    *getregister(val_arr[0]) &= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) &= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 int _inst_or(INST_ARG) {
-    *getregister(val_arr[0]) |= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) |= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 int _inst_xor(INST_ARG) {
-    *getregister(val_arr[0]) ^= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) ^= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 int _inst_shl(INST_ARG) {
-    *getregister(val_arr[0]) <<= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) <<= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 int _inst_shr(INST_ARG) {
-    *getregister(val_arr[0]) >>= getrvalue(type_arr[1], val_arr[1]);
+    *get_register(arg[0]) >>= get_rvalue(arg[1], arg[2]);
     return SUCCESS;
 }
 
 int _inst_inc(INST_ARG) {
-    ++*getregister(val_arr[0]);
+    ++*get_register(arg[0]);
     return SUCCESS;
 }
 int _inst_dec(INST_ARG) {
-    --*getregister(val_arr[0]);
+    --*get_register(arg[0]);
     return SUCCESS;
 }
 int _inst_call(INST_ARG) {
-    pushcallstack(ftell(src_file));
-    fseek(src_file, val_arr[0], SEEK_SET);
+    push_callstack(cur_ptr - base_ptr);
+    _inst_jmp(arg, base_ptr, cur_ptr);
     return SUCCESS;
 }
 int _inst_ret(INST_ARG) {
-    fseek(src_file, popcallstack(), SEEK_SET);
+    int pos = pop_callstack();
+    _inst_jmp(&pos, base_ptr, cur_ptr);
     return SUCCESS;
 }
 int _inst_push(INST_ARG) {
-    pushstack(getrvalue(type_arr[0], val_arr[0]));
+    push_stack(get_rvalue(arg[0], arg[1]));
     return SUCCESS;
 }
 int _inst_pop(INST_ARG) {
-    *getregister(val_arr[0]) = popstack();
+    *get_register(arg[0]) = pop_stack();
     return SUCCESS;
 }
 int _inst_pushf(INST_ARG) {
-    pushstack(*getregister(FLAG));
+    push_stack(*get_register(R_FLAG));
     return SUCCESS;
 }
 int _inst_popf(INST_ARG) {
-    *getregister(val_arr[0]) = *getregister(FLAG);
+    *get_register(arg[0]) = *get_register(R_FLAG);
     return SUCCESS;
 }
 int _inst_nop(INST_ARG) {

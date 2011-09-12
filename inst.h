@@ -1,8 +1,7 @@
 #ifndef __INST_H__
 #define __INST_H__
 
-#define INST_ARG int argc, int* type_arr, int* val_arr,\
-                 FILE* src_file, int* reserve
+#define INST_ARG int* arg, int** base_ptr, int** cur_ptr
 #define DECL_INST(name) int _inst_##name(INST_ARG);
 
 typedef int (*instruction_t)(INST_ARG);

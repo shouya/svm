@@ -2,66 +2,42 @@
 #define __SVM_H__
 
 #include "inst.h"
+#include "def.h"
 
-#define MAX_ARGC 10
-#define BUF_SIZE 64
-#define STACK_SIZE 32
+typedef struct jmplbl_t {
+    int no;
+    char* name;
+    int jmppos;
+} jmplbl_t;
 
-#define SUCCESS (0)
-#define FAILURE (-1)
+#define SM_ARGS int chr, int* state, char* name, int* name_len, char** argv, \
+        int* argv_len, int* argc, int line, int* out_bin, int* pos
+/* syntax parser state machines */
+int sm_symbol_name(SM_ARGS);
+int sm_space(SM_ARGS);
+int sm_newline(SM_ARGS);
+int sm_comma(SM_ARGS);
+int sm_colon(SM_ARGS);
+int sm_semicolon(SM_ARGS);
+int sm_eof(SM_ARGS);
 
-#define JP (3) /* jump point */
-#define VAL (2) /* lexical integer value */
-#define REG (1) /* register */
-#define UK (0) /* unknown */
+int util_stricmp(const char* s1, const char* s2);
+int util_isnumeric(const char* text);
 
-#define EAX (-1)
-#define EBX (-2)
-#define ECX (-3)
-#define EDX (-4)
+void init_registers(void);
 
-#define ESP (-5)
-#define EBP (-6)
-#define EIP (-7)
-#define FLAG (-8)
+int inst_len(const char* name);
+int parse_jmplbl(FILE* infile);
+int parse_file(FILE* infile, int** output);
+int exec_binary(int* bin, int len);
 
-#define LESS (-1)
-#define GREAT (1)
-#define EQUAL (0)
+int* get_register(int reg_no);
+int get_rvalue(int type, int val);
+void push_callstack(int pos);
+int pop_callstack(void);
+void push_stack(int val);
+int pop_stack(void);
 
-int* getregister(int registername);
-int getrvalue(int type, int value);
-int getjumppoint(const char* name);
-void pushcallstack(int value);
-int popcallstack(void);
-void pushstack(int value);
-int popstack(void);
-int stacktop(void);
-
-/**
- * parse file into binary instructions
- * @infile: input file
- * @output: pass in a pointer to char*, this function will assign it
- * @length: length of binary instructions
- * returns SUCCESS/FAILURE
- */
-int parsefile(FILE* infile, int** output, int* length);
-/**
- * translate sigle instruction into binary
- * @name: instuction's name
- * @argc: arguments count
- * @argv: values of arguments
- * @out: output instruction translated
- * returns the instruction's length
- */
-int translateinst(const char* name, int argc, char* const* argv, int* out);
-int execute(const char* insts, int len);
-
-int execfile(FILE* infile);
-int execinst(const char* name, int argc, char* const* argv, FILE* srcfile);
-int checkarg(const char* argtype, int argc, int* type_arr, int* val_arr);
-void initregisters(void);
-
-int main(int argc, char** argv);
+int trans_inst(const char* name, int argc, char* const* argv, int* out_bin);
 
 #endif /* __SVM_H__ */
